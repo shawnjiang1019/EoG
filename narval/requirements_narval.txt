@@ -1,0 +1,27 @@
+# Pinned for the Narval wheelhouse (installed with: pip install --no-index).
+# torch is pinned to 2.9.1 because the prebuilt flash_attn (2.8.3+torch29) is
+# built against torch 2.9 -- installing them together avoids the slow
+# uninstall/reinstall churn and the ABI mismatch.
+#
+# verl itself is NOT listed here: the repo has no setup.py, so it's imported via
+# PYTHONPATH (see setup_env.sh), not pip-installed. This file is just verl's
+# runtime deps needed for the SFT stage (no vLLM -- that's RL-only).
+torch==2.9.1
+flash_attn
+einops
+transformers
+datasets
+accelerate
+peft
+tensordict>=0.8.0,<=0.9.1,!=0.9.0
+torchdata
+hydra-core
+codetiming
+numpy<2.0.0
+pandas
+pyarrow>=19.0.0
+dill
+packaging>=20.0
+pybind11
+wandb
+ray[default]

@@ -1,12 +1,8 @@
 #!/bin/bash
 # =============================================================================
-# EoG Stage-1 (SFT) -- FULL fine-tune (paper-faithful) on Narval.
-# Option A: single node, 4x A100-40GB, FSDP2 FULL_SHARD, CPU offload OFF.
-# Submit with:  sbatch narval/sbatch_sft_fullft.sh
-#
-# Why offload is OFF by default: the 2Wiki SFT data is short (~2.3k tokens avg,
-# p90 ~3.3k), so activations are tiny and the ~28 GB/GPU of FULL_SHARD optimizer
-# state fits 40 GB without offload. If it OOMs, flip the two offload lines below.
+# EoG Stage-1 (SFT) -- FULL fine-tune on Narval, 1 node x 4 A100-40GB.
+# Builds its venv on node-local NVMe (no Lustre pain), builds the SFT parquet if
+# missing, then trains. Submit with:  sbatch narval/sbatch_sft_fullft.sh
 # =============================================================================
 #SBATCH --account=def-YOURPI          # <-- EDIT: your allocation
 #SBATCH --job-name=eog-sftft-2wiki
@@ -15,32 +11,37 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=48
 #SBATCH --mem=498G
-#SBATCH --time=04:00:00                # est ~1.5-3 h; resume_mode=auto if killed
+#SBATCH --time=05:00:00                # ~5 min venv build + parquet + ~1.5-3 h train
 #SBATCH --output=%x-%j.out
 
 set -euo pipefail
 
-# ---- paths (must match prep_sft.sh) ----
-REPO=$SCRATCH/EoG
+export REPO=$SCRATCH/EoG
 MODEL_DIR=$SCRATCH/models/Qwen2.5-7B-Instruct
 DATA=$SCRATCH/EoG/data/2wiki_sft_train.parquet
 SAVE=$SCRATCH/EoG/ckpt/2wiki_sft_fullft
 NGPUS=4
-# ----------------------------------------
 
-module load StdEnv/2023 gcc arrow python/3.11 cuda/12.2
-source "$SCRATCH/EoG/venv/bin/activate"
+# 1) Build + activate the training venv on $SLURM_TMPDIR (NVMe); sets PYTHONPATH
+source "$REPO/narval/setup_env.sh"
 
-# Compute nodes have no internet -> force offline + keep temp off shared /tmp
-export HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1
-export HF_HOME=$SCRATCH/hf
+# 2) Offline (no internet on compute nodes) + temp on local disk
+export HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 HF_HOME=$SCRATCH/hf
 export TOKENIZERS_PARALLELISM=false
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 export TMPDIR=$SLURM_TMPDIR
 
-mkdir -p "$SAVE"
-cd "$REPO"
+# 3) Build the SFT parquet once (uses local tokenizer; no internet needed)
+if [ ! -f "$DATA" ]; then
+  echo "[sbatch] building SFT parquet -> $DATA"
+  mkdir -p "$(dirname "$DATA")"
+  python "$REPO/data/kg_qa_sft_process.py" \
+    --input  "$REPO/sft_data/2wikimultihop_train_sft.jsonl" \
+    --output "$DATA" --model_path "$MODEL_DIR" --max_tokens 12000
+fi
 
+# 4) Train (full fine-tune, FSDP2 FULL_SHARD, offload OFF -- short seqs fit 40GB)
+mkdir -p "$SAVE"; cd "$REPO"
 torchrun --standalone --nnodes=1 --nproc_per_node=$NGPUS \
     -m verl.trainer.fsdp_sft_trainer \
     data.train_files="$DATA" \
@@ -69,18 +70,12 @@ torchrun --standalone --nnodes=1 --nproc_per_node=$NGPUS \
     ulysses_sequence_parallel_size=2 \
     use_remove_padding=true
 
-echo "Full-FT SFT done. Checkpoints under: $SAVE"
+echo "Full-FT SFT done -> $SAVE"
 
-# -----------------------------------------------------------------------------
 # NOTES
-# * OOM fallback (enable CPU offload, ~2-3x slower):
-#       model.fsdp_config.cpu_offload=True  model.fsdp_config.offload_params=True
-#   ...and/or lower data.max_length=4096 (covers p90 for 2Wiki).
-# * Checkpoints include optimizer state (large). max_ckpt_to_keep=1 keeps only the
-#   latest to protect $SCRATCH quota; the final checkpoint is always written.
-# * The saved checkpoint is a sharded FSDP checkpoint. To feed Stage-2 (GRPO) or
-#   run inference, convert to HF format with verl's model_merger, e.g.:
-#       python -m verl.model_merger merge --backend fsdp \
-#           --local_dir "$SAVE/global_step_<N>" --target_dir "$SAVE/hf"
-# * Paper Appendix D uses lr=1e-5; this repo's script ships 2e-5 (kept here).
-# -----------------------------------------------------------------------------
+# * OOM fallback: model.fsdp_config.cpu_offload=True offload_params=True  and/or data.max_length=4096
+# * If flash_attn isn't usable: use_remove_padding=false
+# * Verify the env first on an interactive node (catches missing wheels / flash_attn):
+#     salloc --account=def-YOURPI --gres=gpu:a100:1 --cpus-per-task=6 --mem=32G --time=0:30:00
+#     export REPO=$SCRATCH/EoG && source $REPO/narval/setup_env.sh
+#     python -c "import torch,flash_attn,verl,transformers; print('env OK', torch.__version__)"
