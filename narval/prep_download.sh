@@ -22,11 +22,12 @@ if [ ! -d "$DLVENV" ]; then
 fi
 source "$DLVENV/bin/activate"
 pip install --no-index --upgrade pip
-pip install --no-index huggingface_hub hf_transfer || pip install --no-index huggingface_hub
-export HF_HUB_ENABLE_HF_TRANSFER=1   # faster, more resilient transfer (if available)
+pip install --no-index huggingface_hub hf_xet
+export HF_XET_HIGH_PERFORMANCE=1     # fast Xet transfer (replaces deprecated HF_HUB_ENABLE_HF_TRANSFER)
 
 mkdir -p "$MODEL_DIR"
 echo "Downloading Qwen2.5-7B-Instruct -> $MODEL_DIR (resumable; re-run to continue)"
-huggingface-cli download Qwen/Qwen2.5-7B-Instruct --local-dir "$MODEL_DIR"
+# NOTE: huggingface_hub >=1.x removed `huggingface-cli`; the CLI is now `hf`.
+hf download Qwen/Qwen2.5-7B-Instruct --local-dir "$MODEL_DIR"
 
 echo "Done. Size check:"; du -sh "$MODEL_DIR"

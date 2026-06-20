@@ -4,7 +4,7 @@
 # Builds its venv on node-local NVMe (no Lustre pain), builds the SFT parquet if
 # missing, then trains. Submit with:  sbatch narval/sbatch_sft_fullft.sh
 # =============================================================================
-#SBATCH --account=def-YOURPI          # <-- EDIT: your allocation
+#SBATCH --account=def-enaskt
 #SBATCH --job-name=eog-sftft-2wiki
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:a100:4
