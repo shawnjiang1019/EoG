@@ -57,7 +57,7 @@ torchrun --standalone --nnodes=1 --nproc_per_node=$NGPUS \
     -m verl.trainer.fsdp_sft_trainer \
     data.train_files="$DATA" \
     data.val_files="$DATA" \
-    data.max_length=8192 \
+    data.max_length=4096 \
     data.truncation=right \
     data.micro_batch_size_per_gpu=1 \
     data.train_batch_size=16 \
