@@ -17,7 +17,9 @@
 #SBATCH --output=%x-%j.out
 
 set -uo pipefail
-export REPO=$SCRATCH/EoG
+# REPO defaults to scratch but honors an override: `export REPO=$PWD` from a
+# project-space clone, then sbatch (Slurm forwards your environment by default).
+REPO=${REPO:-$SCRATCH/EoG}
 
 source "$REPO/narval/setup_env.sh"
 

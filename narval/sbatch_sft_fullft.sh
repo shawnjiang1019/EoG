@@ -16,10 +16,12 @@
 
 set -euo pipefail
 
-export REPO=$SCRATCH/EoG
+# REPO can live anywhere (project space recommended): `export REPO=$PWD` before
+# sbatch from your clone. Big artifacts stay on $SCRATCH, never under the repo.
+REPO=${REPO:-$SCRATCH/EoG}
 MODEL_DIR=$SCRATCH/models/Qwen2.5-7B-Instruct
-DATA=$SCRATCH/EoG/data/2wiki_sft_train.parquet
-SAVE=$SCRATCH/EoG/ckpt/2wiki_sft_fullft
+DATA=$SCRATCH/eog/data/2wiki_sft_train.parquet
+SAVE=$SCRATCH/eog/ckpt/2wiki_sft_fullft
 NGPUS=4
 
 # 1) Build + activate the training venv on $SLURM_TMPDIR (NVMe); sets PYTHONPATH
