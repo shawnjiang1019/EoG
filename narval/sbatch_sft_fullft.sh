@@ -11,7 +11,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=48
 #SBATCH --mem=498G
-#SBATCH --time=05:00:00                # ~5 min venv build + parquet + ~1.5-3 h train
+#SBATCH --time=08:00:00                # venv build + model stage + parquet + ~1.5-3 h train
 #SBATCH --output=%x-%j.out
 
 set -euo pipefail
@@ -32,6 +32,14 @@ export HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 HF_HOME=$SCRATCH/hf
 export TOKENIZERS_PARALLELISM=false
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 export TMPDIR=$SLURM_TMPDIR
+
+# 2b) Stage the base model to node-local NVMe. Loading 15GB from $SCRATCH (Lustre)
+#     with 4 ranks reading concurrently is pathologically slow; a one-time
+#     sequential copy + local reads fixes it.
+LOCAL_MODEL=$SLURM_TMPDIR/base_model
+echo "[stage] copying $MODEL_DIR -> $LOCAL_MODEL"
+cp -r "$MODEL_DIR" "$LOCAL_MODEL"
+MODEL_DIR=$LOCAL_MODEL
 
 # 3) Build the SFT parquet once (uses local tokenizer; no internet needed)
 if [ ! -f "$DATA" ]; then

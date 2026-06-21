@@ -1,0 +1,22 @@
+# text_paths reasoner config. Override paths via CLI or edit here.
+# llm_path: point at the SFT'd explorer checkpoint (HF format) or a base model.
+llm_path: ./models/Qwen2.5-7B-Instruct
+paths_source: ./data/reasoner/2wiki_explorer_paths.jsonl
+val_source: ""
+
+num_paths: 8
+max_len: 4096
+max_new_tokens: 256
+
+lora_rank: 32          # LoRA keeps it light on A100-40GB; set 0 for full fine-tune
+lora_alpha: 32
+bf16: true
+gradient_checkpointing: true
+
+lr: 2.0e-5
+epochs: 3
+train_batch_size: 16
+micro_batch_size: 1
+warmup_ratio: 0.03
+
+output_dir: ./outputs/reasoner/text_paths
