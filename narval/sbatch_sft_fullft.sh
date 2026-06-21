@@ -32,6 +32,7 @@ export HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 HF_HOME=$SCRATCH/hf
 export TOKENIZERS_PARALLELISM=false
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 export TMPDIR=$SLURM_TMPDIR
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True   # reclaim fragmentation (full-FT is tight on 40GB)
 
 # 2b) Stage the base model to node-local NVMe. Loading 15GB from $SCRATCH (Lustre)
 #     with 4 ranks reading concurrently is pathologically slow; a one-time
@@ -57,6 +58,7 @@ torchrun --standalone --nnodes=1 --nproc_per_node=$NGPUS \
     data.train_files="$DATA" \
     data.val_files="$DATA" \
     data.max_length=8192 \
+    data.truncation=right \
     data.micro_batch_size_per_gpu=1 \
     data.train_batch_size=16 \
     data.multiturn.enable=true \
