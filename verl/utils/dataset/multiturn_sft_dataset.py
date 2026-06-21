@@ -152,7 +152,14 @@ class MultiTurnSFTDataset(Dataset):
         concat_loss_mask: list[int],
         concat_attention_mask: list[int],
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        full_tokens_list = full_tokens.tolist()
+        # full_tokens may be a torch.Tensor (.tolist()) or, on newer tokenizers,
+        # a tokenizers.Encoding (.ids); normalize to a plain list either way.
+        if hasattr(full_tokens, "tolist"):
+            full_tokens_list = full_tokens.tolist()
+        elif hasattr(full_tokens, "ids"):
+            full_tokens_list = list(full_tokens.ids)
+        else:
+            full_tokens_list = list(full_tokens)
 
         if len(concat_tokens) != len(full_tokens_list) or not all(
             a == b for a, b in zip(concat_tokens, full_tokens_list, strict=True)
@@ -169,7 +176,7 @@ class MultiTurnSFTDataset(Dataset):
             )
 
         return (
-            full_tokens,
+            torch.tensor(full_tokens_list, dtype=torch.long),
             torch.tensor(concat_loss_mask, dtype=torch.long),
             torch.tensor(concat_attention_mask, dtype=torch.long),
         )
