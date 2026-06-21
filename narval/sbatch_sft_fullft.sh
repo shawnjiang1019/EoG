@@ -19,9 +19,9 @@ set -euo pipefail
 # REPO can live anywhere (project space recommended): `export REPO=$PWD` before
 # sbatch from your clone. Big artifacts stay on $SCRATCH, never under the repo.
 REPO=${REPO:-$SCRATCH/EoG}
-MODEL_DIR=$SCRATCH/models/Qwen2.5-7B-Instruct
-DATA=$SCRATCH/eog/data/2wiki_sft_train.parquet
-SAVE=$SCRATCH/eog/ckpt/2wiki_sft_fullft
+MODEL_DIR=${MODEL_DIR:-$SCRATCH/models/Qwen2.5-7B-Instruct}
+DATA=${DATA:-$SCRATCH/eog/data/2wiki_sft_train.parquet}
+SAVE=${SAVE:-$SCRATCH/eog/ckpt/2wiki_sft_fullft}   # override to avoid clobbering another run
 NGPUS=4
 
 # 1) Build + activate the training venv on $SLURM_TMPDIR (NVMe); sets PYTHONPATH
@@ -77,8 +77,8 @@ torchrun --standalone --nnodes=1 --nproc_per_node=$NGPUS \
     trainer.save_freq=100 \
     trainer.test_freq=-1 \
     trainer.max_ckpt_to_keep=1 \
-    ulysses_sequence_parallel_size=2 \
-    use_remove_padding=true
+    ulysses_sequence_parallel_size=1 \
+    use_remove_padding=false
 
 echo "Full-FT SFT done -> $SAVE"
 
