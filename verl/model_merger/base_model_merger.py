@@ -12,9 +12,16 @@ from transformers import (
     AutoConfig,
     AutoModelForCausalLM,
     AutoModelForTokenClassification,
-    AutoModelForVision2Seq,
     GenerationConfig,
 )
+
+try:
+    from transformers import AutoModelForVision2Seq
+except ImportError:  # renamed to AutoModelForImageTextToText in transformers >= 5
+    try:
+        from transformers import AutoModelForImageTextToText as AutoModelForVision2Seq
+    except ImportError:
+        AutoModelForVision2Seq = None
 
 from verl.utils import hf_processor, hf_tokenizer
 
