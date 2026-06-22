@@ -6,10 +6,9 @@ passages) that extract_graphs.py turns into the `graph`.
 """
 import argparse
 import json
+import os
 
 import pandas as pd
-
-DEV_URL = "https://huggingface.co/datasets/xanhho/2WikiMultihopQA/resolve/main/dev.parquet"
 
 
 def parse_field(x):
@@ -27,12 +26,20 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True)
     ap.add_argument("--n", type=int, default=0, help="0 = all dev rows")
-    ap.add_argument("--url", default=DEV_URL)
+    ap.add_argument("--repo", default="xanhho/2WikiMultihopQA")
+    ap.add_argument("--file", default="dev.parquet")
     args = ap.parse_args()
 
-    df = pd.read_parquet(args.url)
+    # Download via huggingface_hub (already installed) then read the local file,
+    # so we don't need fsspec/aiohttp to read a parquet over http.
+    from huggingface_hub import hf_hub_download
+
+    local = hf_hub_download(repo_id=args.repo, filename=args.file, repo_type="dataset")
+    df = pd.read_parquet(local)
     if args.n:
         df = df.head(args.n)
+
+    os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
 
     n = 0
     with open(args.out, "w", encoding="utf-8") as f:
